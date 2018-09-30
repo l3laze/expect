@@ -1,0 +1,10 @@
+{
+  "name": "expect",
+  "version": "0.0.0-rc0",
+  "description": "A simple expect-based BDD asseertion library.",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/test.js"
+  }
+}
