@@ -23,7 +23,24 @@ function makeAssertion (that, v2, comparatorName, comparator, inclMode = true) {
   const modeString = that.humanModeString()
   const retVal = {
     pass: (result === !that.mode.not),
-    message: format('Expected %j to %s%s %j.', that.v1, (inclMode ? modeString + ' ' : that.mode.not ? 'not ' : ''), comparatorName, v2)
+    message: format('Expected %j to %s%s %j.', that.v1,
+      (inclMode
+        ? modeString + ' '
+        : that.mode.not
+          ? 'not '
+          : ''), comparatorName, v2),
+    get and () {
+      return that
+    },
+    set and (v) {
+      return that
+    },
+    get or () {
+      return that
+    },
+    set or (v) {
+      return that
+    }
   }
 
   that.mode.deep = false
@@ -36,38 +53,101 @@ function makeAssertion (that, v2, comparatorName, comparator, inclMode = true) {
   return retVal
 }
 
-function be (that, parent) {
-  const self = {
-    a: (v2) => {
-      const first = v2.charAt(0).toLowerCase()
-      const vowStart = (first === 'a' || first === 'e' || first === 'i' || first === 'o' || first === 'u' || first === 'y')
-      const cname = (vowStart ? 'be an' : 'be a')
-      return makeAssertion(that, v2, cname, (a, b) => {
-        return a.constructor.name === b
-      }, false)
-    },
+function be (that) {
+  const beAOrAn = (a, b) => {
+    return b !== 'Arguments'
+      ? (typeof a === typeof b || typeof a === b || a.constructor.name.toLowerCase() === b.toLowerCase())
+      : Object.prototype.toString.call(a) === '[object Arguments]'
   }
 
-  return self
+  return {
+    a: (v2) => {
+      return makeAssertion(that, v2, 'be a', beAOrAn, false)
+    },
+    an: (v2) => {
+      return makeAssertion(that, v2, 'be an', beAOrAn, false)
+    },
+    get less () {
+      that.mode.less = true
+      that.mode.greater = false
+
+      return this
+    },
+    set less (v) {
+      that.mode.less = !!v
+      that.mode.greater = false
+
+      return this
+    },
+    get greater () {
+      that.mode.less = false
+      that.mode.greater = true
+
+      return this
+    },
+    set greater (v) {
+      that.mode.less = false
+      that.mode.greater = !!v
+
+      return this
+    },
+    get equal () {
+      that.mode.equal = true
+
+      return this
+    },
+    set equal (v) {
+      that.mode.equal = !!v
+
+      return this
+    },
+    get than () {
+      return {
+        or: {
+          equal: {
+            to: (v2) => {
+              let [ label, fn ] = (that.mode.less
+                ? [ 'be less than or equal to', (a, b) => a <= b ]
+                : [ 'be greater than or equal to', (a, b) => a >= b ])
+              return makeAssertion(that, v2, label, fn, false)
+            }
+          }
+        }
+      }
+    },
+    set than (v2) {
+      let [ label, fn ] = (that.mode.less
+        ? [ 'be less than', (a, b) => a < b ]
+        : [ 'be greater than', (a, b) => a > b ])
+      return makeAssertion(that, v2, label, fn, false)
+    }
+  }
 }
 
-function have (that, parent) {
-  const self = {
+function have (that) {
+  return {
     property: (v2) => makeAssertion(that, v2, 'have property', (a, b) => {
       return a.hasOwnProperty(b)
     }, false),
+    length: {
+      of: (v2) => makeAssertion(that, v2, 'have length of', (a, b) => {
+        return a.length === b
+      }, false),
+    }
   }
-
-  return self
 }
 
 function to (that) {
   const self = {
     equal: (v2) => makeAssertion(that, v2, 'equal', (a, b) => {
-      if (that.mode.loose) return a == b
-      else if (that.mode.deep) return a === b
-      // strict by default
-      else return a === b
+      if (that.mode.loose) {
+        return a == b
+      }
+      else if (that.mode.deep) {
+        return a === b
+      } else {
+        return a === b
+      }
     }),
     get deeply () {
       that.mode.deep = true
@@ -120,27 +200,11 @@ function to (that) {
       that.mode.strict = !!v
 
       return self
-    },
-    get and () {
-      that.mode.and = true
-      that.mode.or = false
-    },
-    set and (v) {
-      that.mode.and = !!v
-      that.mode.or = false
-    },
-    get or () {
-      that.mode.and = false
-      that.mode.or = true
-    },
-    set or (v) {
-      that.mode.and = false
-      that.mode.or = !!v
     }
   }
 
-  self.be = be(that, self)
-  self.have = have(that, self)
+  self.be = be(that)
+  self.have = have(that)
 
   return self
 }
@@ -149,12 +213,13 @@ function expect (v1) {
   const self = {
     v1,
     mode: {
-      and: false,
       not: false,
       deep: false,
       loose: false,
-      or: false,
-      strict: true
+      strict: true,
+      less: false,
+      greater: false,
+      equal: false
     },
   }
 
