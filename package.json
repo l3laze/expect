@@ -4,7 +4,14 @@
   "description": "A simple expect-based BDD asseertion library.",
   "main": "index.js",
   "license": "MIT",
+  "files": [
+    "src/index.js"
+  ],
   "scripts": {
     "test": "node tests/test.js"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "ebug": "^1.0.0-rc12"
   }
 }
