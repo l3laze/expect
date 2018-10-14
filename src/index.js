@@ -1,146 +1,146 @@
 'use strict'
 
 const { format } = require('util')
+const deepEqual = require('./fastDeepEqual.js')
+const debug = (typeof process.env.DEBUG !== 'undefined'
+  ? require('ebug')('expect')
+  : function ignore (...args) {})
 
 const [ red, green, reset ] = [ '\u001B[31m', '\u001B[32m', '\u001B[0m' ]
 const passed = format('%s%s %s', green, '\u2713', reset) // Green check mark
 const failed = format('%s%s %s', red, '\u2620', reset) // Red skull & crossbones
 
-function humanModeString () {
-  const activeModes = Object.keys(this.mode)
-    .filter((m) => /deep|loose|strict/.test(m) && this.mode[ m ] === true)
+function humanModifierString (modifier) {
+  const activemodifiers = Object.keys(modifier)
+    .filter((m) => /deep|loose|strict/.test(m) && modifier[ m ] === true)
     .map((m) => m + 'ly')
 
-  return (this.mode.not ? 'not ' : '') + activeModes.join(', ')
+  return (modifier.not ? 'not ' : '') + activemodifiers.join(', ')
 }
 
-function deepEqual (v1, v2) {
-  return v1 === v2
-}
-
-function makeAssertion (that, v2, comparatorName, comparator, inclMode = true) {
+function makeAssertion (that, v2, comparatorName, comparator, inclModifier = true) {
   const result = comparator(that.v1, v2)
-  const modeString = that.humanModeString()
-  const retVal = {
-    pass: (result === !that.mode.not),
-    message: format('Expected %j to %s%s %j.', that.v1, (inclMode ? modeString + ' ' : that.mode.not ? 'not ' : ''), comparatorName, v2)
-  }
+  const modifierString = humanModifierString(that.modifier)
+  that.retVal.pass = (result === !that.modifier.not)
+  that.retVal.message = format('Expected %j to %s%s %j.', that.v1,
+    (inclModifier
+      ? modifierString + ' '
+      : that.modifier.not
+        ? 'not '
+        : ''), comparatorName, v2)
 
-  that.mode.deep = false
-  that.mode.loose = false
-  that.mode.not = false
-  that.mode.strict = true
+  that.modifier.deep = false
+  that.modifier.loose = false
+  that.modifier.not = false
+  that.modifier.strict = true
 
-  console.debug('%s %s', (retVal.pass ? passed : failed), retVal.message)
+  that.modifier.greater = false
+  that.modifier.less = false
 
-  return retVal
+  debug('%s %s', (that.retVal.pass ? passed : failed), that.retVal.message)
+
+  return that.retVal
 }
 
-function be (that, parent) {
-  const self = {
+function be (that) {
+  const beAOrAn = (a, b) => {
+    return b.toString().toLowerCase() !== 'arguments'
+      ? (typeof a === typeof b || '' + typeof a === '' + b || a.constructor.name.toLowerCase() === b.toLowerCase())
+      : Object.prototype.toString.call(a) === '[object Arguments]'
+  }
+
+  return {
     a: (v2) => {
-      const first = v2.charAt(0).toLowerCase()
-      const vowStart = (first === 'a' || first === 'e' || first === 'i' || first === 'o' || first === 'u' || first === 'y')
-      const cname = (vowStart ? 'be an' : 'be a')
-      return makeAssertion(that, v2, cname, (a, b) => {
-        return a.constructor.name === b
-      }, false)
+      return makeAssertion(that, v2, 'be a', beAOrAn, false)
     },
-  }
+    an: (v2) => {
+      return makeAssertion(that, v2, 'be an', beAOrAn, false)
+    },
+    get less () {
+      that.modifier.less = true
+      that.modifier.greater = false
 
-  return self
+      return this
+    },
+    get greater () {
+      that.modifier.less = false
+      that.modifier.greater = true
+
+      return this
+    },
+    get than () {
+      return {
+        or: {
+          equal: {
+            to: (v2) => {
+              let [ label, fn ] = (that.modifier.less
+                ? [ 'be less than or equal to', (a, b) => a <= b ]
+                : [ 'be greater than or equal to', (a, b) => a >= b ])
+              return makeAssertion(that, v2, label, fn, false)
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
-function have (that, parent) {
-  const self = {
+function have (that) {
+  return {
     property: (v2) => makeAssertion(that, v2, 'have property', (a, b) => {
       return a.hasOwnProperty(b)
     }, false),
+    length: {
+      of: (v2) => makeAssertion(that, v2, 'have length of', (a, b) => {
+        return a.length === b
+      }, false)
+    }
   }
-
-  return self
 }
 
 function to (that) {
+  const equal = (v2) => makeAssertion(that, v2, 'equal', (a, b) => {
+    if (that.modifier.loose) {
+      return a == b // eslint-disable-line eqeqeq
+    } else if (that.modifier.deep) {
+      return deepEqual(a, b)
+    } else {
+      return a === b
+    }
+  })
+
   const self = {
-    equal: (v2) => makeAssertion(that, v2, 'equal', (a, b) => {
-      if (that.mode.loose) return a == b
-      else if (that.mode.deep) return a === b
-      // strict by default
-      else return a === b
-    }),
     get deeply () {
-      that.mode.deep = true
-      that.mode.loose = false
-      that.mode.strict = false
+      that.modifier.deep = true
+      that.modifier.loose = false
+      that.modifier.strict = false
 
-      return self
-    },
-    set deeply (v) {
-      that.mode.deep = !!v
-      that.mode.loose = false
-      that.mode.strict = false
-
-      return self
+      return { equal }
     },
     get loosely () {
-      that.mode.deep = false
-      that.mode.loose = true
-      that.mode.strict = false
+      that.modifier.deep = false
+      that.modifier.loose = true
+      that.modifier.strict = false
 
-      return self
-    },
-    set loosely (v) {
-      that.mode.deep = false
-      that.mode.loose = !!v
-      that.mode.strict = false
-
-      return self
+      return { equal }
     },
     get not () {
-      that.mode.not = true
-
-      return self
-    },
-    set not (v) {
-      that.mode.not = !!v
+      that.modifier.not = true
 
       return self
     },
     get strictly () {
-      that.mode.deep = false
-      that.mode.loose = false
-      that.mode.strict = true
+      that.modifier.deep = false
+      that.modifier.loose = false
+      that.modifier.strict = true
 
-      return self
+      return { equal }
     },
-    set strictly (v) {
-      that.mode.deep = false
-      that.mode.loose = false
-      that.mode.strict = !!v
-
-      return self
-    },
-    get and () {
-      that.mode.and = true
-      that.mode.or = false
-    },
-    set and (v) {
-      that.mode.and = !!v
-      that.mode.or = false
-    },
-    get or () {
-      that.mode.and = false
-      that.mode.or = true
-    },
-    set or (v) {
-      that.mode.and = false
-      that.mode.or = !!v
-    }
+    equal
   }
 
-  self.be = be(that, self)
-  self.have = have(that, self)
+  self.be = be(that)
+  self.have = have(that)
 
   return self
 }
@@ -148,18 +148,28 @@ function to (that) {
 function expect (v1) {
   const self = {
     v1,
-    mode: {
-      and: false,
+    modifier: {
       not: false,
       deep: false,
       loose: false,
-      or: false,
-      strict: true
+      strict: true,
+      less: false,
+      greater: false
+    }
+  }
+
+  self.retVal = {
+    pass: null,
+    message: '',
+    get and () {
+      return self
     },
+    get or () {
+      return self
+    }
   }
 
   self.to = to(self)
-  self.humanModeString = humanModeString.bind(self)
 
   return self
 }
