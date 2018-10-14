@@ -1,38 +1,45 @@
 'use strict'
 
-const benchStarted = Date.now()
-
-const f2 = require('./vanilla-test.js').fn
-const f2Reqd = Date.now() - benchStarted
-console.info('f2 took %dms to require', f2Reqd)
-
-const f1 = require('./test.js').fn
-const f1Reqd = Date.now() - (f2Reqd + benchStarted)
-console.info('f1 took %dms to require', f1Reqd)
-
+console.time('Bench')
 const max = 1000
-let i
-let f1Started
 
-for (i = 0; i < max; i++) {
-  if (!f1Started) {
-    f1Started = Date.now()
+function f1Test() {
+  let i
+  let f1Started = false
+  console.time('f1Require')
+  const f1 = require('./test.js').fn
+  console.timeEnd('f1Require')
+
+  for (i = 0; i < max; i++) {
+    if (!f1Started) {
+      console.time('f1Run')
+      f1Started = true
+    }
+
+    f1()
   }
-
-  f1()
+  console.timeEnd('f1Run')
 }
-const f1Ended = Date.now()
-console.info('f1 took %dms to run', f1Ended - f1Started)
 
-let f2Started
-for (i = 0; i < max; i++) {
-  if (!f2Started) {
-    f2Started = Date.now()
+function f2Test () {
+  let i
+  let f2Started = false
+  console.time('f2Require')
+  const f2 = require('./vanilla-test.js').fn
+  console.timeEnd('f2Require')
+
+  for (i = 0; i < max; i++) {
+    if (!f2Started) {
+      console.time('f2Run')
+      f2Started = true
+    }
+
+    f2()
   }
-
-  f2()
+  console.timeEnd('f2Run')
 }
-const f2Ended = Date.now()
-console.info('f2 took %dms to run', f2Ended - f2Started)
 
-console.info('Finished in %dms', Date.now() - benchStarted)
+f1Test()
+f2Test()
+
+console.timeEnd('Bench')

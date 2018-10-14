@@ -1,6 +1,7 @@
 'use strict'
 
 const { expect } = require ('./../src/index.js')
+
 function fn () {
   expect('a').to.equal('a')
   expect(3).to.equal(3)
@@ -35,12 +36,16 @@ function fn () {
   
   expect('ass').to.not.equal('hat')
   expect('2').to.not.loosely.equal(5)
+
+  expect({ a: 1 }).to.deeply.equal({ a: 1 })
+  expect(new Uint8Array([ 1, 2, 3 ])).to.deeply.equal(new Uint8Array([ 1, 2, 3 ]))
+  expect(Buffer.from([ 1, 2, 3 ])).to.deeply.equal(Buffer.from([ 1, 2, 3 ]))
 }
 
 if (!module.parent) {
-  const startedAt = Date.now()
+  console.time(__filename)
   fn()
-  console.info('Finished in %dms', Date.now() - startedAt)
+  console.timeEnd(__filename)
 }
 
 module.exports = {

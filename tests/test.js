@@ -36,12 +36,16 @@ function fn () {
   
   expect('ass').to.not.equal('hat')
   expect('2').to.not.equal(5)
+
+  expect({ a: 1 }).to.deep.equal({ a: 1 })
+  expect(new Uint8Array([ 1, 2, 3 ])).to.deep.equal(new Uint8Array([ 1, 2, 3 ]))
+  expect(Buffer.from([ 1, 2, 3 ])).to.deep.equal(Buffer.from([ 1, 2, 3 ]))
 }
 
 if (!module.parent) {
-  const startedAt = Date.now()
+  console.time(__filename)
   fn()
-  console.info('Finished in %dms', Date.now() - startedAt)
+  console.timeEnd(__filename)
 }
 
 module.exports = {

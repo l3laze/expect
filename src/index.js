@@ -1,7 +1,10 @@
 'use strict'
 
-const debug = require('ebug')('expect')
 const { format } = require('util')
+const deepEqual = require('./fastDeepEqual.js')
+const debug = (typeof process.env.DEBUG !== 'undefined'
+  ? require('ebug')('expect')
+  : function ignore (...args) {})
 
 const [ red, green, reset ] = [ '\u001B[31m', '\u001B[32m', '\u001B[0m' ]
 const passed = format('%s%s %s', green, '\u2713', reset) // Green check mark
@@ -15,20 +18,16 @@ function humanModifierString (modifier) {
   return (modifier.not ? 'not ' : '') + activemodifiers.join(', ')
 }
 
-function deepEqual (v1, v2) {
-  return v1 === v2
-}
-
 function makeAssertion (that, v2, comparatorName, comparator, inclModifier = true) {
   const result = comparator(that.v1, v2)
   const modifierString = humanModifierString(that.modifier)
   that.retVal.pass = (result === !that.modifier.not)
   that.retVal.message = format('Expected %j to %s%s %j.', that.v1,
-      (inclModifier
-        ? modifierString + ' '
-        : that.modifier.not
-          ? 'not '
-          : ''), comparatorName, v2)
+    (inclModifier
+      ? modifierString + ' '
+      : that.modifier.not
+        ? 'not '
+        : ''), comparatorName, v2)
 
   that.modifier.deep = false
   that.modifier.loose = false
@@ -45,8 +44,8 @@ function makeAssertion (that, v2, comparatorName, comparator, inclModifier = tru
 
 function be (that) {
   const beAOrAn = (a, b) => {
-    return b !== 'Arguments'
-      ? (typeof a === typeof b || typeof a === b || a.constructor.name.toLowerCase() === b.toLowerCase())
+    return b.toString().toLowerCase() !== 'arguments'
+      ? (typeof a === typeof b || '' + typeof a === '' + b || a.constructor.name.toLowerCase() === b.toLowerCase())
       : Object.prototype.toString.call(a) === '[object Arguments]'
   }
 
@@ -63,21 +62,9 @@ function be (that) {
 
       return this
     },
-    set less (v) {
-      that.modifier.less = !!v
-      that.modifier.greater = false
-
-      return this
-    },
     get greater () {
       that.modifier.less = false
       that.modifier.greater = true
-
-      return this
-    },
-    set greater (v) {
-      that.modifier.less = false
-      that.modifier.greater = !!v
 
       return this
     },
@@ -94,12 +81,6 @@ function be (that) {
           }
         }
       }
-    },
-    set than (v2) {
-      let [ label, fn ] = (that.modifier.less
-        ? [ 'be less than', (a, b) => a < b ]
-        : [ 'be greater than', (a, b) => a > b ])
-      return makeAssertion(that, v2, label, fn, false)
     }
   }
 }
@@ -112,7 +93,7 @@ function have (that) {
     length: {
       of: (v2) => makeAssertion(that, v2, 'have length of', (a, b) => {
         return a.length === b
-      }, false),
+      }, false)
     }
   }
 }
@@ -120,10 +101,9 @@ function have (that) {
 function to (that) {
   const equal = (v2) => makeAssertion(that, v2, 'equal', (a, b) => {
     if (that.modifier.loose) {
-      return a == b
-    }
-    else if (that.modifier.deep) {
-      return a === b
+      return a == b // eslint-disable-line eqeqeq
+    } else if (that.modifier.deep) {
+      return deepEqual(a, b)
     } else {
       return a === b
     }
@@ -137,23 +117,9 @@ function to (that) {
 
       return { equal }
     },
-    set deeply (v) {
-      that.modifier.deep = !!v
-      that.modifier.loose = false
-      that.modifier.strict = false
-
-      return { equal }
-    },
     get loosely () {
       that.modifier.deep = false
       that.modifier.loose = true
-      that.modifier.strict = false
-
-      return { equal }
-    },
-    set loosely (v) {
-      that.modifier.deep = false
-      that.modifier.loose = !!v
       that.modifier.strict = false
 
       return { equal }
@@ -163,22 +129,10 @@ function to (that) {
 
       return self
     },
-    set not (v) {
-      that.modifier.not = !!v
-
-      return self
-    },
     get strictly () {
       that.modifier.deep = false
       that.modifier.loose = false
       that.modifier.strict = true
-
-      return { equal }
-    },
-    set strictly (v) {
-      that.modifier.deep = false
-      that.modifier.loose = false
-      that.modifier.strict = !!v
 
       return { equal }
     },
@@ -210,13 +164,7 @@ function expect (v1) {
     get and () {
       return self
     },
-    set and (v) {
-      return self
-    },
     get or () {
-      return self
-    },
-    set or (v) {
       return self
     }
   }
